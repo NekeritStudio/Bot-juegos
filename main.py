@@ -2,17 +2,14 @@ import discord
 from discord.ext import commands
 from discord import app_commands, ui, TextStyle
 import random
-import logging
-import os
 
-# --- CONFIGURACIÓN DE LOGS ---
-logger = logging.getLogger('discord_bot')
+# --- IMPORTACIONES DE CONFIGURACIÓN Y LOGS ---
+from config import DISCORD_TOKEN
+from log_setup import setup_logging
+
+# --- CONFIGURACIÓN INICIAL ---
+logger = setup_logging()
 logger.setLevel(logging.INFO)
-file_handler = logging.FileHandler(filename='bot.log', encoding='utf-8', mode='w')
-dt_fmt = '%Y-%m-%d %H:%M:%S'
-formatter = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
 
 # --- CONSTANTES Y LÓGICA DE JUEGO ---
 SIMBOLO_X = '❌'
@@ -443,9 +440,10 @@ async def on_ready():
         logger.exception("Error sincronizando comandos:")
         print(f"Error sincronizando comandos: {e}")
 
-@bot.event
-async def on_command_error(ctx, error):
-    logger.error(f"Error en comando: {error}")
+# Manejador de errores para comandos de barra diagonal (app_commands)
+@bot.tree.on_error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    logger.error(f"Error en el comando '{interaction.command.name}': {error}", exc_info=True)
 
 @bot.tree.command(name="adivinar", description="Inicia un juego para adivinar un número entre 1 y 50.")
 async def adivinar_command(interaction: discord.Interaction):
@@ -519,8 +517,7 @@ bot.tree.add_command(app_commands.Command(name="duelo", description="Reta a otro
 
 if __name__ == "__main__":
     try:
-        # Recuerda reemplazar 'TU_TOKEN_AQUÍ' con tu token real
-        bot.run('TU_TOKEN_AQUÍ')
+        bot.run(DISCORD_TOKEN)
     except Exception as e:
         logger.exception(f"Error crítico al iniciar el bot: {e}")
         print(f"Error crítico: {e}")
