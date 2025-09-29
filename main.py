@@ -354,16 +354,10 @@ async def tictactoe_command(interaction: discord.Interaction, oponente: discord.
 bot.tree.add_command(app_commands.Command(name="tictactoe", description="Inicia Tres en Raya.", callback=tictactoe_command))
 
 if __name__ == "__main__":
-    # Usar variable de entorno para el token
-    token = os.getenv('DISCORD_BOT_TOKEN')
-    if not token:
-        logger.error("No se encontró el token de Discord. Asegúrate de configurar la variable DISCORD_BOT_TOKEN.")
-        print("ERROR: No se encontró el token de Discord.")
-        print("Configura la variable de entorno: export DISCORD_BOT_TOKEN='tu_token_aquí'")
-        exit(1)
+    
     
     try:
-        bot.run(token)
+        bot.run('   TU_TOKEN_AQUÍ   ')
     except Exception as e:
         logger.exception(f"Error crítico al iniciar el bot: {e}")
         print(f"Error crítico: {e}")
