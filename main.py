@@ -2,14 +2,15 @@ import discord
 from discord.ext import commands
 from discord import app_commands, ui, TextStyle
 import random
+import logging
 
 # --- IMPORTACIONES DE CONFIGURACIÓN Y LOGS ---
 from config import DISCORD_TOKEN
 from log_setup import setup_logging
 
 # --- CONFIGURACIÓN INICIAL ---
-logger = setup_logging()
-logger.setLevel(logging.INFO)
+setup_logging() # Configura el sistema de logging raíz
+logger = logging.getLogger('discord_bot') # Obtiene un logger para nuestro bot
 
 # --- CONSTANTES Y LÓGICA DE JUEGO ---
 SIMBOLO_X = '❌'
