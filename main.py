@@ -514,7 +514,6 @@ async def duelo_command(interaction: discord.Interaction, oponente: discord.Memb
         logger.exception(f"Error en comando duelo: {e}")
         await interaction.response.send_message("Ocurrió un error iniciando el duelo.", ephemeral=True)
 
-bot.tree.add_command(duelo_command)
 
 
 if __name__ == "__main__":
