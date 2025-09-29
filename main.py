@@ -441,8 +441,8 @@ async def on_ready():
         logger.exception("Error sincronizando comandos:")
         print(f"Error sincronizando comandos: {e}")
 
-# Manejador de errores para comandos de barra diagonal (app_commands)
-@bot.tree.on_error
+# Manejador de errores para comandos de barra diagonal (app_commands) - FIXED
+@bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     logger.error(f"Error en el comando '{interaction.command.name}': {error}", exc_info=True)
 
