@@ -441,7 +441,7 @@ async def on_ready():
         logger.exception("Error sincronizando comandos:")
         print(f"Error sincronizando comandos: {e}")
 
-# Manejador de errores para comandos de barra diagonal (app_commands) - FIXED
+# Manejador de errores para comandos de barra diagonal (app_commands)
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     logger.error(f"Error en el comando '{interaction.command.name}': {error}", exc_info=True)
@@ -460,6 +460,9 @@ async def adivinar_command(interaction: discord.Interaction):
         logger.exception(f"Error en comando adivinar: {e}")
         await interaction.response.send_message("Ocurrió un error iniciando el juego.", ephemeral=True)
 
+# NOTA: Envolviendo la función con @bot.tree.command si quieres que el nombre sea 'tictactoe'
+# o si quieres que los decoradores de describe se apliquen correctamente.
+@bot.tree.command(name="tictactoe", description="Inicia Tres en Raya.")
 @app_commands.describe(oponente="Opcional: Menciona a un jugador para JvJ. Si se omite, jugarás contra la IA.")
 async def tictactoe_command(interaction: discord.Interaction, oponente: discord.Member = None):
     try:
@@ -511,9 +514,7 @@ async def duelo_command(interaction: discord.Interaction, oponente: discord.Memb
         logger.exception(f"Error en comando duelo: {e}")
         await interaction.response.send_message("Ocurrió un error iniciando el duelo.", ephemeral=True)
 
-# Registro de los comandos
-bot.tree.add_command(app_commands.Command(name="tictactoe", description="Inicia Tres en Raya.", callback=tictactoe_command))
-bot.tree.add_command(app_commands.Command(name="duelo", description="Reta a otro miembro a un duelo de insultos.", callback=duelo_command))
+bot.tree.add_command(duelo_command)
 
 
 if __name__ == "__main__":
