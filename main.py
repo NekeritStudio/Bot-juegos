@@ -20,6 +20,30 @@ SIMBOLO_O = '⭕'
 CASILLA_VACIA_INT = '-'
 EMOJI_VACIA = '⬜'
 
+# --- DATOS PARA EL JUEGO DE DUELO ---
+DUELOS_DATA = {
+    "¡Luchas como un granjero!": {
+        "correcta": "¡Qué apropiado! ¡Tú peleas como una vaca!",
+        "incorrectas": ["¡No soy un granjero!", "¡Tu mamá es una granjera!", "¡Cállate!"]
+    },
+    "¡Pronto detendré tu absurdo comportamiento de pirata!": {
+        "correcta": "Si quisiera un sermón, iría a la iglesia.",
+        "incorrectas": ["¡No soy un pirata!", "¿Ah, sí?", "¡Eso es imposible!"]
+    },
+    "¡Mi pañuelo limpiará tu sangre!": {
+        "correcta": "Ah, ¿entonces ya has elegido uno?",
+        "incorrectas": ["¡Qué asco!", "¡No vas a tocarme!", "¡Qué amenaza tan tonta!"]
+    },
+    "¡He hablado con simios más educados que tú!": {
+        "correcta": "Me alegra que asistieras a tu reunión familiar.",
+        "incorrectas": ["¡No soy un simio!", "¿Y qué?", "¡Estás mintiendo!"]
+    },
+    "¡No hay palabras para describir mi náusea!": {
+        "correcta": "Sí que las hay, solo que nunca las aprendiste.",
+        "incorrectas": ["¿Te sientes mal?", "¡Pues vete!", "¡Hueles peor!"]
+    }
+}
+
 def get_winner(board: list, symbol: str) -> bool:
     """Verifica si hay un ganador en el tablero."""
     wins = [(0,1,2),(3,4,5),(6,7,8),(0,3,6),(1,4,7),(2,5,8),(0,4,8),(2,4,6)]
@@ -210,7 +234,7 @@ class GuessNumberModal(ui.Modal, title='Adivina el Número'):
     def __init__(self, view):
         super().__init__()
         self.view = view
-        
+    
     guess = ui.TextInput(label='Escribe tu número aquí', style=TextStyle.short, placeholder='Ej: 25')
     
     async def on_submit(self, interaction: discord.Interaction):
@@ -268,7 +292,7 @@ class AdivinaNumeroView(ui.View):
             for item in self.children:
                 item.disabled = True
             await interaction.response.edit_message(
-                content=f"🌟 ¡Felicidades {self.author.mention}! El número **{self.numero_secreto}** en {self.intentos} intentos!", 
+                content=f"🌟 ¡Felicidades {self.author.mention}! Adivinaste el número **{self.numero_secreto}** en {self.intentos} intentos!", 
                 view=self
             )
             logger.info(f"[AdivinaElNumero] {self.author.name} ganó en {self.intentos} intentos.")
@@ -292,6 +316,120 @@ class AdivinaNumeroView(ui.View):
             content=f"Tu número ({guess}) es **{pista}**. Te quedan **{intentos_restantes}** intentos."
         )
 
+# --- VISTA PARA DUELO DE INSULTOS ---
+class DueloView(ui.View):
+    def __init__(self, retador: discord.User, retado: discord.User):
+        super().__init__(timeout=300)
+        self.players = (retador, retado)
+        self.scores = {retador.id: 3, retado.id: 3}
+        self.current_player_index = 0
+        self.current_insulto = None
+        self.message = None
+        
+        # Copiamos los insultos para no modificar el original
+        self.insultos_disponibles = list(DUELOS_DATA.keys())
+        
+        self.setup_turn()
+
+    def get_status_message(self, result_text: str = "") -> str:
+        """Genera el mensaje de estado del duelo."""
+        atacante = self.players[self.current_player_index]
+        defensor = self.players[1 - self.current_player_index]
+        
+        header = f"🤺 **Duelo de Insultos entre {self.players[0].mention} y {self.players[1].mention}** 🤺\n"
+        scores = f"❤️ {self.players[0].name}: **{self.scores[self.players[0].id]}** | ❤️ {self.players[1].name}: **{self.scores[self.players[1].id]}**\n\n"
+        
+        if result_text:
+            return f"{header}{scores}{result_text}"
+
+        turn_info = f"Turno de **{atacante.mention}**. ¡Elige una respuesta para el insulto de **{defensor.mention}**!\n"
+        insulto_text = f"> **{self.current_insulto}**"
+        
+        return f"{header}{scores}{turn_info}{insulto_text}"
+        
+    def setup_turn(self):
+        """Prepara la interfaz para el turno actual."""
+        self.clear_items()
+        
+        if not self.insultos_disponibles: # Reinicia si se acaban
+            self.insultos_disponibles = list(DUELOS_DATA.keys())
+            
+        self.current_insulto = random.choice(self.insultos_disponibles)
+        self.insultos_disponibles.remove(self.current_insulto)
+        
+        datos_insulto = DUELOS_DATA[self.current_insulto]
+        opciones_correctas = [datos_insulto['correcta']]
+        opciones_incorrectas = random.sample(datos_insulto['incorrectas'], 2) # Elegimos 2 incorrectas
+        
+        opciones = opciones_correctas + opciones_incorrectas
+        random.shuffle(opciones)
+        
+        select_options = [discord.SelectOption(label=op, value=op) for op in opciones]
+        select = ui.Select(placeholder="Elige tu respuesta ingeniosa...", options=select_options)
+        
+        select.callback = self.select_callback
+        self.add_item(select)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        """Callback para cuando un jugador elige una respuesta."""
+        atacante = self.players[self.current_player_index]
+        defensor = self.players[1 - self.current_player_index]
+        
+        if interaction.user != atacante:
+            await interaction.response.send_message("¡No es tu turno de responder!", ephemeral=True)
+            return
+
+        selected_answer = interaction.data['values'][0]
+        correct_answer = DUELOS_DATA[self.current_insulto]['correcta']
+
+        if selected_answer == correct_answer:
+            # La respuesta fue correcta, el defensor pierde un punto
+            self.scores[defensor.id] -= 1
+            logger.info(f"[Duelo] {atacante.name} respondió correctamente. {defensor.name} pierde una vida.")
+            result_text = f"✅ ¡Correcto! **{defensor.name}** pierde una vida."
+        else:
+            # La respuesta fue incorrecta, el atacante pierde un punto
+            self.scores[atacante.id] -= 1
+            logger.info(f"[Duelo] {atacante.name} respondió incorrectamente y pierde una vida.")
+            result_text = f"❌ ¡Incorrecto! La respuesta era:\n> *{correct_answer}*\n**{atacante.name}** pierde una vida."
+
+        if self.scores[defensor.id] <= 0:
+            await self.game_over(interaction, winner=atacante, loser=defensor)
+            return
+        elif self.scores[atacante.id] <= 0:
+            await self.game_over(interaction, winner=defensor, loser=atacante)
+            return
+        
+        # Cambiar de turno
+        self.current_player_index = 1 - self.current_player_index
+        self.setup_turn()
+        
+        await interaction.response.edit_message(content=self.get_status_message(result_text=result_text), view=self)
+
+    async def game_over(self, interaction: discord.Interaction, winner: discord.User, loser: discord.User):
+        """Finaliza el juego y declara un ganador."""
+        self.stop()
+        for item in self.children:
+            item.disabled = True
+        
+        final_message = (
+            f"🤺 **¡Duelo finalizado!** 🤺\n"
+            f"🏆 **{winner.mention}** ha derrotado a **{loser.mention}** con su ingenio superior! 🏆"
+        )
+        await interaction.response.edit_message(content=final_message, view=self)
+        logger.info(f"[Duelo] Partida finalizada. Ganador: {winner.name}.")
+
+    async def on_timeout(self):
+        self.stop()
+        for item in self.children:
+            item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(content="⌛ El duelo ha expirado por inactividad. ⌛", view=self)
+                logger.warning(f"[Duelo] Duelo entre {self.players[0].name} y {self.players[1].name} ha expirado.")
+            except discord.NotFound:
+                pass
+
 # --- EVENTOS Y COMANDOS ---
 @bot.event
 async def on_ready():
@@ -314,7 +452,7 @@ async def adivinar_command(interaction: discord.Interaction):
     try:
         view = AdivinaNumeroView(interaction.user)
         await interaction.response.send_message(
-            f"🎉 **¡Adivina el número!** {interaction.user.mention}, número entre 1-50. Tienes {view.max_intentos} intentos.", 
+            f"🎉 **¡Adivina el número!** {interaction.user.mention}, he pensado en un número entre 1 y 50. Tienes {view.max_intentos} intentos.", 
             view=view
         )
         view.message = await interaction.original_response()
@@ -351,13 +489,38 @@ async def tictactoe_command(interaction: discord.Interaction, oponente: discord.
         logger.exception(f"Error en comando tictactoe: {e}")
         await interaction.response.send_message("Ocurrió un error iniciando el juego.", ephemeral=True)
 
+@bot.tree.command(name="duelo", description="Reta a otro miembro a un duelo de insultos.")
+@app_commands.describe(oponente="El miembro al que quieres retar.")
+async def duelo_command(interaction: discord.Interaction, oponente: discord.Member):
+    try:
+        if oponente == interaction.user:
+            await interaction.response.send_message("No puedes retarte a ti mismo, genio. 😒", ephemeral=True)
+            return
+        if oponente.bot:
+            await interaction.response.send_message("No puedes retar a un bot. No tienen sentimientos que herir. 🤖", ephemeral=True)
+            return
+            
+        view = DueloView(retador=interaction.user, retado=oponente)
+        initial_message = view.get_status_message()
+        
+        await interaction.response.send_message(content=initial_message, view=view)
+        view.message = await interaction.original_response()
+        
+        logger.info(f"[Comando] Usuario {interaction.user.name} inició un duelo contra {oponente.name}.")
+        
+    except Exception as e:
+        logger.exception(f"Error en comando duelo: {e}")
+        await interaction.response.send_message("Ocurrió un error iniciando el duelo.", ephemeral=True)
+
+# Registro de los comandos
 bot.tree.add_command(app_commands.Command(name="tictactoe", description="Inicia Tres en Raya.", callback=tictactoe_command))
+bot.tree.add_command(app_commands.Command(name="duelo", description="Reta a otro miembro a un duelo de insultos.", callback=duelo_command))
+
 
 if __name__ == "__main__":
-    
-    
     try:
-        bot.run('   TU_TOKEN_AQUÍ   ')
+        # Recuerda reemplazar 'TU_TOKEN_AQUÍ' con tu token real
+        bot.run('TU_TOKEN_AQUÍ')
     except Exception as e:
         logger.exception(f"Error crítico al iniciar el bot: {e}")
         print(f"Error crítico: {e}")
